@@ -42,11 +42,11 @@ jobs:
           ${{ runner.os }}-nuget-
           
     - name: 還原相依性
-      run: dotnet restore TodoApi/TodoApi.csproj
+      run: dotnet restore 
       
     - name: 建構專案
       run: dotnet build --configuration Release --no-restore
-      
+
     - name: 執行單元測試
       run: |
         dotnet test ${{ env.TEST_PROJECT_NAME }}/${{ env.TEST_PROJECT_NAME }}.csproj \
