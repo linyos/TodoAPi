@@ -42,7 +42,7 @@ jobs:
           ${{ runner.os }}-nuget-
           
     - name: 還原相依性
-      run: dotnet restore TodoApi/TodoApi.csproj TodoApi.Tests/TodoApi.Tests.csproj
+      run: dotnet restore TodoApi/TodoApi.csproj
       
     - name: 建構專案
       run: dotnet build --configuration Release --no-restore
