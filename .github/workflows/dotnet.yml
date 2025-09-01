@@ -1,0 +1,151 @@
+name: .NET CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  PROJECT_NAME: 'TodoApi'
+  TEST_PROJECT_NAME: 'TodoApi.Tests'
+
+jobs:
+  test:
+    name: 測試和程式碼品質檢查
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 取出程式碼
+      uses: actions/checkout@v4
+      
+    - name: 設定 .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: 快取 NuGet 套件
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+          
+    - name: 還原相依性
+      run: dotnet restore
+      
+    - name: 建構專案
+      run: dotnet build --configuration Release --no-restore
+      
+    - name: 執行單元測試
+      run: |
+        dotnet test ${{ env.TEST_PROJECT_NAME }}/${{ env.TEST_PROJECT_NAME }}.csproj \
+          --configuration Release \
+          --no-build \
+          --verbosity normal \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ./coverage
+          
+    - name: 程式碼覆蓋率報告
+      uses: codecov/codecov-action@v3
+      with:
+        directory: ./coverage
+        fail_ci_if_error: false
+        
+    - name: 發布測試結果
+      uses: dorny/test-reporter@v1
+      if: success() || failure()
+      with:
+        name: .NET 測試結果
+        path: '**/*.trx'
+        reporter: dotnet-trx
+
+  security-scan:
+    name: 安全性掃描
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: 取出程式碼
+      uses: actions/checkout@v4
+      
+    - name: 設定 .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: 安全性弱點掃描
+      run: |
+        dotnet list package --vulnerable --include-transitive
+        dotnet list package --deprecated
+
+  build-and-deploy:
+    name: 建構和部署
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: 取出程式碼
+      uses: actions/checkout@v4
+      
+    - name: 設定 .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: 還原相依性
+      run: dotnet restore
+      
+    - name: 建構應用程式
+      run: dotnet build --configuration Release --no-restore
+      
+    - name: 發佈應用程式
+      run: |
+        dotnet publish ${{ env.PROJECT_NAME }}/${{ env.PROJECT_NAME }}.csproj \
+          --configuration Release \
+          --no-build \
+          --output ./publish
+          
+    - name: 建立部署壓縮檔
+      run: |
+        cd ./publish
+        zip -r ../app-${{ github.sha }}.zip .
+        cd ..
+        
+    - name: 上傳建構產物
+      uses: actions/upload-artifact@v4
+      with:
+        name: published-app
+        path: app-${{ github.sha }}.zip
+        retention-days: 30
+        
+    # 如果您有 Azure 或其他雲端平台，可以在這裡加入部署步驟
+    # - name: 部署到 Azure
+    #   uses: azure/webapps-deploy@v2
+    #   with:
+    #     app-name: 'your-app-name'
+    #     publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+    #     package: app-${{ github.sha }}.zip
+
+  notification:
+    name: 通知
+    runs-on: ubuntu-latest
+    needs: [build-and-deploy]
+    if: always()
+    
+    steps:
+    - name: 成功通知
+      if: needs.build-and-deploy.result == 'success'
+      run: |
+        echo "🎉 部署成功！"
+        echo "提交: ${{ github.sha }}"
+        echo "分支: ${{ github.ref_name }}"
+        
+    - name: 失敗通知
+      if: failure()
+      run: |
+        echo "❌ 工作流程失敗"
+        echo "請檢查執行記錄以了解詳細資訊"
