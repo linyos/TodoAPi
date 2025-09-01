@@ -42,7 +42,7 @@ jobs:
           ${{ runner.os }}-nuget-
           
     - name: 還原相依性
-      run: dotnet restore
+      run: dotnet restore TodoApi/TodoApi.csproj TodoApi.Tests/TodoApi.Tests.csproj
       
     - name: 建構專案
       run: dotnet build --configuration Release --no-restore
@@ -130,14 +130,7 @@ jobs:
         name: published-app
         path: app-${{ github.sha }}.zip
         retention-days: 30
-        
-    # 如果您有 Azure 或其他雲端平台，可以在這裡加入部署步驟
-    # - name: 部署到 Azure
-    #   uses: azure/webapps-deploy@v2
-    #   with:
-    #     app-name: 'your-app-name'
-    #     publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-    #     package: app-${{ github.sha }}.zip
+  
 
   notification:
     name: 通知
