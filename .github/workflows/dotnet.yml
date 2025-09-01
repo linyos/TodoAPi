@@ -41,8 +41,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
           
+    # 明確還原主專案與測試專案以確保產生 assets 檔
     - name: 還原相依性
-      run: dotnet restore 
+      run: dotnet restore TodoApi/TodoApi.csproj TodoApi.Tests/TodoApi.Tests.csproj
       
     - name: 建構專案
       run: dotnet build --configuration Release --no-restore
@@ -70,6 +71,8 @@ jobs:
         name: .NET 測試結果
         path: './TestResults/**/*.trx'
         reporter: dotnet-trx
+        token: ${{ secrets.GITHUB_TOKEN }}
+      # 注意：在 fork 的 PR 上，即使有 token 也可能因 GitHub 權限限制無法建立 check run
 
   security-scan:
     name: 安全性掃描
@@ -85,6 +88,10 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
+    # 必須還原才能讓 dotnet list 等指令找到 assets 檔
+    - name: 還原相依性
+      run: dotnet restore
+
     - name: 安全性弱點掃描
       run: |
         dotnet list package --vulnerable --include-transitive
